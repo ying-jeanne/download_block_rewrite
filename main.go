@@ -17,9 +17,9 @@ func main() {
 	var (
 		origin_bucket_folder = "gs://dev-us-central1-cortex-tsdb-dev/9960"
 		block_file_name      = "blocks.txt"
-		maxline              = 0
+		maxline              = 1
 		data_folder          = "./testbucket"
-		dst_bucket_folder    = "gs://dev-us-central1-cortex-tsdb-dev/ying"
+		dst_bucket_folder    = "gs://dev-us-central1-cortex-tsdb-dev-rewrite-test/dst"
 	)
 
 	// crate log files
@@ -48,7 +48,8 @@ func main() {
 	log.Printf("Execution time of listBlocks: %v", endTime.Sub(startTime))
 	fmt.Println("the total blocks would be rewritten are: ", len(block_folders))
 
-	var copy_block_total_time, rewrite_block_total_time, upload_block_total_time, delete_block_total_time time.Time
+	var copy_block_total_time time.Time
+	var rewrite_block_total_time, upload_block_total_time, delete_block_total_time time.Time
 	for _, block_folder := range block_folders {
 		// get block_uid
 		s := strings.Split(block_folder, "/")
@@ -72,7 +73,7 @@ func main() {
 		startTime = time.Now()
 		new_block_uid, err := rewriteBlock(block_uid, data_folder)
 		if err != nil {
-			log.Println("Failed to write new block, the block_uid is ", block_uid)
+			log.Println("Failed to write new block, the block_uid is ", block_uid, err.Error())
 			continue
 		}
 		endTime = time.Now()
@@ -116,8 +117,8 @@ func rewriteBlock(block_uid string, data_folder string) (string, error) {
 	log.Printf("the block_uid is %s, and data_folder is: %s", block_uid, data_folder)
 	cmd := exec.Command("./thanos", "tools", "bucket", "rewrite", "--no-dry-run",
 		"--id", block_uid,
-		"--objstore.config-file", "./objstore_config.yml",
-		"--rewrite.to-delete-config-file", "./matchers.yml",
+		"--objstore.config-file", "./config/objstore_config.yml",
+		"--rewrite.to-delete-config-file", "./config/matchers.yml",
 	)
 	// Run the command and capture its output
 	output, err := cmd.CombinedOutput()
