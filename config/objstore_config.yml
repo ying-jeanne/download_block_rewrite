@@ -1,3 +1,7 @@
-type: FILESYSTEM
+# type: FILESYSTEM
+# config:
+#   directory: ./testbucket
+type: GCS
 config:
-  directory: ./testbucket
+  bucket: "dev-us-central1-cortex-tsdb-dev-rewrite-test"
+prefix: "9960"

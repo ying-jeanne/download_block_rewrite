@@ -1,1 +1,1 @@
-gs://dev-us-central1-cortex-tsdb-dev/9960/01EYYPMK842ZKSB4H2R86M878N/
+gs://dev-us-central1-cortex-tsdb-dev-rewrite-test/dst/01EYYPMK842ZKSB4H2R86M878N/

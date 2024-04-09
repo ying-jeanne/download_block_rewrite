@@ -7,7 +7,6 @@ import (
 	"log"
 	"os"
 	"os/exec"
-	"path/filepath"
 	"regexp"
 	"strings"
 	"time"
@@ -15,11 +14,11 @@ import (
 
 func main() {
 	var (
-		origin_bucket_folder = "gs://dev-us-central1-cortex-tsdb-dev/9960"
+		origin_bucket_folder = "gs://dev-us-central1-cortex-tsdb-dev-rewrite-test/9960" //"gs://dev-us-central1-cortex-tsdb-dev/9960"
 		block_file_name      = "blocks.txt"
-		maxline              = 1
+		maxline              = 0
 		data_folder          = "./testbucket"
-		dst_bucket_folder    = "gs://dev-us-central1-cortex-tsdb-dev-rewrite-test/dst"
+		// dst_bucket_folder    = "gs://dev-us-central1-cortex-tsdb-dev-rewrite-test/dst"
 	)
 
 	// crate log files
@@ -48,8 +47,8 @@ func main() {
 	log.Printf("Execution time of listBlocks: %v", endTime.Sub(startTime))
 	fmt.Println("the total blocks would be rewritten are: ", len(block_folders))
 
-	var copy_block_total_time time.Time
-	var rewrite_block_total_time, upload_block_total_time, delete_block_total_time time.Time
+	// var copy_block_total_time time.Time
+	var rewrite_block_total_time time.Time //, upload_block_total_time, delete_block_total_time time.Time
 	for _, block_folder := range block_folders {
 		// get block_uid
 		s := strings.Split(block_folder, "/")
@@ -59,15 +58,15 @@ func main() {
 		block_uid := s[len(s)-2]
 
 		// copy block in local
-		startTime := time.Now()
-		err = copyBlock(block_folder, data_folder)
-		if err != nil {
-			log.Println("Failed to download new block, the block_uid is ", block_uid)
-			continue
-		}
-		endTime := time.Now()
-		copy_block_total_time = copy_block_total_time.Add(endTime.Sub(startTime))
-		log.Printf("Execution time of copy block %s: %v, total download block until now %v", block_folder, endTime.Sub(startTime), copy_block_total_time)
+		// startTime := time.Now()
+		// err = copyBlock(block_folder, data_folder)
+		// if err != nil {
+		// 	log.Println("Failed to download new block, the block_uid is ", block_uid)
+		// 	continue
+		// }
+		// endTime := time.Now()
+		// copy_block_total_time = copy_block_total_time.Add(endTime.Sub(startTime))
+		// log.Printf("Execution time of copy block %s: %v, total download block until now %v", block_folder, endTime.Sub(startTime), copy_block_total_time)
 
 		// rewrite block with filter
 		startTime = time.Now()
@@ -78,55 +77,71 @@ func main() {
 		}
 		endTime = time.Now()
 		rewrite_block_total_time = rewrite_block_total_time.Add(endTime.Sub(startTime))
-		log.Printf("Execution time of rewrite block %s: %v, total time for rewrite %v", block_folder, endTime.Sub(startTime), rewrite_block_total_time)
+		log.Printf("Execution time of rewrite block %s to %s : %v, total time for rewrite %v", block_folder, new_block_uid, endTime.Sub(startTime), rewrite_block_total_time)
 
 		// upload block to gcp
-		startTime = time.Now()
-		err = uploadBlock(new_block_uid, data_folder, dst_bucket_folder)
-		if err != nil {
-			log.Println("Failed to upload new block, the block_uid is ", new_block_uid)
-			continue
-		}
-		endTime = time.Now()
-		upload_block_total_time = upload_block_total_time.Add(endTime.Sub(startTime))
-		log.Printf("Execution time of upload block %s: %v, total time for upload %v", block_folder, endTime.Sub(startTime), upload_block_total_time)
+		// startTime = time.Now()
+		// err = uploadBlock(new_block_uid, data_folder, dst_bucket_folder)
+		// if err != nil {
+		// 	log.Println("Failed to upload new block, the block_uid is ", new_block_uid)
+		// 	continue
+		// }
+		// endTime = time.Now()
+		// upload_block_total_time = upload_block_total_time.Add(endTime.Sub(startTime))
+		// log.Printf("Execution time of upload block %s: %v, total time for upload %v", block_folder, endTime.Sub(startTime), upload_block_total_time)
 
 		// delete new old block in local
-		startTime = time.Now()
-		err = deleteBlock(data_folder, block_uid, new_block_uid)
+		// startTime = time.Now()
+		err = deleteBlock(origin_bucket_folder, block_uid)
 		if err != nil {
-			log.Println("Failed to delete block, the block_uids are ", block_uid, new_block_uid)
+			log.Println("Failed to delete block, the block_uids are ", block_uid)
 			continue
 		}
-		endTime = time.Now()
-		delete_block_total_time = delete_block_total_time.Add(endTime.Sub(startTime))
-		log.Printf("Execution time of delete block %s, %s: %v, total time for delete %v", block_uid, new_block_uid, endTime.Sub(startTime), delete_block_total_time)
+		// endTime = time.Now()
+		// delete_block_total_time = delete_block_total_time.Add(endTime.Sub(startTime))
+		// log.Printf("Execution time of delete block %s, %s: %v, total time for delete %v", block_uid, new_block_uid, endTime.Sub(startTime), delete_block_total_time)
+		// delete block in the bucket, since we might rerun the tests
+
 	}
 }
 
-func deleteBlock(data_folder, block_uid, new_block_uid string) error {
-	cmd := exec.Command("rm", "-rf", filepath.Join(data_folder, block_uid), filepath.Join(data_folder, new_block_uid))
+// func deleteBlock(data_folder, block_uid, new_block_uid string) error {
+// 	cmd := exec.Command("rm", "-rf", filepath.Join(data_folder, block_uid), filepath.Join(data_folder, new_block_uid))
+// 	_, err := cmd.CombinedOutput()
+// 	if err != nil {
+// 		log.Fatalf("delete block %s and %s failed: %v", block_uid, new_block_uid, err)
+// 	}
+// 	return err
+// }
+
+func deleteBlock(data_folder, block_uid string) error {
+	cmd := exec.Command("gsutil", "rm", "-r", strings.Join([]string{data_folder, block_uid}, "/"))
+	fmt.Println("the origin command line is: ", cmd)
 	_, err := cmd.CombinedOutput()
 	if err != nil {
-		log.Fatalf("delete block %s and %s failed: %v", block_uid, new_block_uid, err)
+		log.Fatalf("delete block %s failed: %v", block_uid, err)
 	}
 	return err
 }
 
 func rewriteBlock(block_uid string, data_folder string) (string, error) {
 	log.Printf("the block_uid is %s, and data_folder is: %s", block_uid, data_folder)
-	cmd := exec.Command("./thanos", "tools", "bucket", "rewrite", "--no-dry-run",
+	cmd := exec.Command("./thanos", "tools", "bucket", "rewrite", "--no-dry-run", "--delete-blocks",
 		"--id", block_uid,
 		"--objstore.config-file", "./config/objstore_config.yml",
 		"--rewrite.to-delete-config-file", "./config/matchers.yml",
+		"--tmp.dir", "./testbucket",
 	)
 	// Run the command and capture its output
 	output, err := cmd.CombinedOutput()
 
+	log.Println(string(output))
+
 	if err != nil {
 		fmt.Println("COMMAND is", cmd.String(), "Error:", err.Error())
-		return "", nil
+		return "", err
 	}
+
 	re := regexp.MustCompile(`new=([^ ]+)`)
 	match := re.FindSubmatch(output)
 	if len(match) > 1 {
@@ -136,24 +151,24 @@ func rewriteBlock(block_uid string, data_folder string) (string, error) {
 	return "", fmt.Errorf("can't read new block id from the log")
 }
 
-func uploadBlock(block_uid string, data_folder string, dst_bucket_folder string) error {
-	cmd := exec.Command("gsutil", "cp", "-r", filepath.Join(data_folder, block_uid), dst_bucket_folder)
-	_, err := cmd.Output()
-	if err != nil {
-		log.Fatalf("upload block %s failed: %v", block_uid, err)
-		return err
-	}
-	return nil
-}
+// func uploadBlock(block_uid string, data_folder string, dst_bucket_folder string) error {
+// 	cmd := exec.Command("gsutil", "cp", "-r", filepath.Join(data_folder, block_uid), dst_bucket_folder)
+// 	_, err := cmd.Output()
+// 	if err != nil {
+// 		log.Fatalf("upload block %s failed: %v", block_uid, err)
+// 		return err
+// 	}
+// 	return nil
+// }
 
-func copyBlock(block_folder string, data_folder string) error {
-	cmd := exec.Command("gsutil", "cp", "-r", block_folder, data_folder)
-	_, err := cmd.Output()
-	if err != nil {
-		log.Fatalf("download block %s failed: %v", block_folder, err)
-	}
-	return err
-}
+// func copyBlock(block_folder string, data_folder string) error {
+// 	cmd := exec.Command("gsutil", "cp", "-r", block_folder, data_folder)
+// 	_, err := cmd.Output()
+// 	if err != nil {
+// 		log.Fatalf("download block %s failed: %v", block_folder, err)
+// 	}
+// 	return err
+// }
 
 func listBlocks(bucket_folder string, blocks_file *os.File, maxline int) []string {
 	// Command to list objects in the specified GCS bucket
